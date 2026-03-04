@@ -22,10 +22,10 @@ class VoiceInfo(BaseModel):
     language: str
     gender: str
     name: str
-    preview_audio: HttpUrl
-    support_pause: bool
-    emotion_support: bool
-    support_interactive_avatar: bool
+    preview_audio: Optional[str] = None
+    support_pause: bool = False
+    emotion_support: bool = False
+    support_interactive_avatar: bool = False
 
 
 class VoicesData(BaseModel):
@@ -38,15 +38,17 @@ class VoicesResponse(BaseHeyGenResponse):
 
 # User quota models
 class QuotaDetails(BaseModel):
-    api: int
-    streaming_avatar: int
-    streaming_avatar_instance_quota: int
-    seat: int
+    api: Optional[int] = 0
+    streaming_avatar: Optional[int] = 0
+    streaming_avatar_instance_quota: Optional[int] = 0
+    seat: Optional[int] = 0
+    plan_credit: Optional[int] = 0
 
 
 class RemainingQuota(BaseModel):
-    remaining_quota: int
-    details: QuotaDetails
+    remaining_quota: Optional[int] = 0
+    details: Optional[QuotaDetails] = None
+    plan_credit: Optional[int] = None
 
 
 class RemainingQuotaResponse(BaseHeyGenResponse):
@@ -340,7 +342,12 @@ class HeyGenApiClient:
             return await self._make_request("user/remaining_quota")
 
         def transform_data(data, mcp_class):
-            return mcp_class(remaining_credits=int(data.remaining_quota / 60))
+            quota = data.remaining_quota or 0
+            plan_credit = data.plan_credit or 0
+            if data.details and data.details.plan_credit:
+                plan_credit = data.details.plan_credit
+            credits = plan_credit if plan_credit else int(quota / 60)
+            return mcp_class(remaining_credits=credits)
 
         return await self._handle_api_request(
             api_call=api_call,
