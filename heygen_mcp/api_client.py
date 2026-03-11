@@ -1,6 +1,7 @@
 """HeyGen API client module for interacting with the HeyGen API."""
 
 import importlib.metadata
+import os
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -205,7 +206,7 @@ class MCPVideoStatusResponse(BaseHeyGenResponse):
 class HeyGenApiClient:
     """Client for interacting with the HeyGen API."""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: str | None = None):
         """Initialize the API client with the API key."""
         self.api_key = api_key
 
@@ -216,7 +217,9 @@ class HeyGenApiClient:
             self.version = "unknown"
 
         self.user_agent = f"heygen-mcp/{self.version}"
-        self.base_url = "https://api.heygen.com/v2"
+        self.base_url = base_url or os.getenv(
+            "HEYGEN_BASE_URL", "https://api.heygen.com/v2"
+        )
         self._client = httpx.AsyncClient()
 
     async def close(self):

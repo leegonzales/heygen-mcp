@@ -7,6 +7,7 @@ import sys
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
+from heygen_mcp import workflow_tools
 from heygen_mcp.api_client import (
     Character,
     Dimension,
@@ -46,7 +47,8 @@ async def get_api_client() -> HeyGenApiClient:
         raise ValueError("HEYGEN_API_KEY environment variable not set.")
 
     # Create and store the client
-    api_client = HeyGenApiClient(api_key)
+    base_url = os.getenv("HEYGEN_BASE_URL")
+    api_client = HeyGenApiClient(api_key, base_url=base_url)
     return api_client
 
 
@@ -158,6 +160,86 @@ async def get_avatar_video_status(video_id: str) -> MCPVideoStatusResponse:
         return await client.get_video_status(video_id)
     except Exception as e:
         return MCPVideoStatusResponse(error=str(e))
+
+
+############################
+# Workflow Tool Definitions #
+############################
+
+
+@mcp.tool(
+    name="check_inventory",
+    description=(
+        "Fetches credits, voices, and avatars in one call. Returns a combined "
+        "inventory with capabilities info. Voices with non-HTTPS previews are "
+        "flagged with hasPreview: false but not dropped."
+    ),
+)
+async def check_inventory_tool() -> dict:
+    """One-shot inventory: credits + voices + avatars."""
+    try:
+        client = await get_api_client()
+        return await workflow_tools.check_inventory(client)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@mcp.tool(
+    name="create_video",
+    description=(
+        "Creates a HeyGen avatar video. Accepts avatar/voice as name or ID "
+        "(fuzzy name matching). Returns a job handle to poll with "
+        "get_video_status."
+    ),
+)
+async def create_video_tool(
+    avatar: str,
+    voice: str,
+    script: str,
+    title: str = "",
+    width: int = 1280,
+    height: int = 720,
+    avatar_style: str = "normal",
+    emotion: str = "",
+    voice_speed: float = 1.0,
+    background_type: str = "color",
+    background_value: str = "#000000",
+) -> dict:
+    """Create a video with smart avatar/voice lookup."""
+    try:
+        client = await get_api_client()
+        return await workflow_tools.create_video(
+            client,
+            avatar=avatar,
+            voice=voice,
+            script=script,
+            title=title,
+            width=width,
+            height=height,
+            avatar_style=avatar_style,
+            emotion=emotion or None,
+            voice_speed=voice_speed,
+            background_type=background_type,
+            background_value=background_value,
+        )
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@mcp.tool(
+    name="get_video_status",
+    description=(
+        "Polls the status of a video job created with create_video. "
+        "Returns status, videoUrl, duration, and any errors."
+    ),
+)
+async def get_video_status_tool(job_id: str) -> dict:
+    """Poll video job status."""
+    try:
+        client = await get_api_client()
+        return await workflow_tools.get_video_status(client, job_id)
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def parse_args():
